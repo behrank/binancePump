@@ -48,13 +48,6 @@ def post_signal_to_api(signal_data):
 
 #Main func
 def main():
-    #READ API CONFIG
-    api_config = {}
-    with open('api_config.json') as json_data:
-        api_config = json.load(json_data)
-        json_data.close()
-
-    TOKEN = api_config['telegram_bot_token']
 
     def process_message(tickers):
         # print("stream: {} data: {}".format(msg['stream'], msg['data']))
@@ -252,7 +245,7 @@ def main():
             if anyPrinted:
                 print("")
 
-    client = Client(api_config['api_key'], api_config['api_secret'])
+    client = Client("ClekRwvhp7KJ3Qumjhn1aTboWLFyssY1AOgPmHKP0gCJMorjXsqxB32aTNZ0dP3O", "KdiFqvTqW1s5r2nsW7ZnAWItr54yOm1BIa8yQmQyJzu475C537FlDghm0kFavyC4")
           
     bm = BinanceSocketManager(client)
     conn_key = bm.start_ticker_socket(process_message)
