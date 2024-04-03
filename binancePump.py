@@ -1,18 +1,13 @@
 import pandas as pd
 import numpy as np
-
-import dateparser
-import pytz
+import requests
 import json
 
 import datetime as dt
-from datetime import datetime, timedelta
-import time
+from datetime import datetime, timedelta, timezone
 
 from tqdm import tqdm as tqdm
 
-import os
-import joblib
 import operator
 from termcolor import colored
 
@@ -24,7 +19,7 @@ from pricechange import *
 from binanceHelper import *
 from pricegroup import *
 
-import telebot
+#Definitions
 
 show_only_pair = "USDT" #Select nothing for all, only selected currency will be shown
 show_limit = 1      #minimum top query limit
@@ -32,11 +27,26 @@ min_perc = 0.05     #min percentage change
 price_changes = []
 price_groups = {}
 last_symbol = "X"
-chat_ids = []
+api_url = "http://127.0.0.1:5000/Signal"
 
-def set_chat_id(c):
-    chat_ids.append(c)
+#API Connector
+def post_signal_to_api(signal_data):
+    
+    signal_data["requestToken"] = "XnE9BREaitRBYIFIqJ1MTuqbJdZzQRYwhlStPviHxrQN0Wmgl4H98HQVlTgXMIO7Xo3s5p3UaQd62eXN5xoeYcobZicEEVX6FLDoKAaudkksdSYvamoyf8fsQFt9DlnDzbiZjnE8rRMaxtSHoM22r2HwDEAmz9HJOnrzpQDdeso9LMtxiEHM7ynlVOYYetr5uGi59ZpvWtJ0TuHJ15HhFsidB3XhZj4IjIKd36g3WTCOb47M5b4lCBfXVAAL7ys4hs87PyAAFGVp2FxtAHAG8PlZTYJscaWE6Z7ok1SP6NBUzocXaAGM3cwNf3RNAiJY"
+    
+    try:
+        response = requests.post(api_url, json=signal_data)
+        
+        # Yanıtı kontrol et
+        if response.status_code == 200:
+            return "Signal sent."
+        else:
+            return f"Error on send HTTP code: {response.status_code}, Error message: {response.text}"
+    except Exception as e:
+        return f"Error not send: {str(e)}"
 
+
+#Main func
 def main():
     #READ API CONFIG
     api_config = {}
@@ -45,23 +55,6 @@ def main():
         json_data.close()
 
     TOKEN = api_config['telegram_bot_token']
-    tb = telebot.TeleBot(TOKEN)	#create a new Telegram Bot object
-
-    def send_message(chat_id, msg):
-        try:
-            tb.send_message(chat_id, msg)
-        except:
-            pass
-
-    
-    def send_to_all_chat_ids(msg):
-        for chat_id in chat_ids:
-            send_message(chat_id, msg)
-
-    @tb.message_handler(commands=['start', 'help'])
-    def send_welcome(message):
-        set_chat_id(message.chat.id)
-        tb.reply_to(message, "Welcome to BinancePump Bot, Binance Top Tick Count, Top Price and Volume Change Feeds will be shared with you. One of it could be start of pump or dump, keep an eye on me!")
 
     def process_message(tickers):
         # print("stream: {} data: {}".format(msg['stream'], msg['data']))
@@ -147,10 +140,24 @@ def main():
                             if not header_printed:
                                 msg = "Top Ticks"
                                 print(msg)
-                                send_to_all_chat_ids(msg)
+
                                 header_printed = True
+                            
                             print(max_price_group.to_string(True))
-                            send_to_all_chat_ids(max_price_group.to_string(False))
+                            
+                            signal_data = {
+                                "SignalType": 0,
+                                "SymbolCode": max_price_group.symbol,
+                                "IsUp": console_color != 'red',
+                                "EventTime": str(max_price_group.last_event_time.astimezone().isoformat()),
+                                "RecentPriceChange": str(max_price_group.relative_price_change),
+                                "TopPriceChange": str(max_price_group.total_price_change),
+                                "VolumeChange": str(max_price_group.total_volume_change),
+                                "LastPrice": str(max_price_group.last_price),
+                                "LastVolume": str(max_price_group.volume)
+                            }
+                            result_message = post_signal_to_api(signal_data)
+                            print(result_message)
                             anyPrinted = True
 
             sorted_price_group = sorted(price_groups, key=lambda k:price_groups[k]['total_price_change'])
@@ -165,10 +172,23 @@ def main():
                             if not header_printed:
                                 msg = "Top Total Price Change"
                                 print(msg)
-                                send_to_all_chat_ids(msg)
                                 header_printed = True
                             print(max_price_group.to_string(True))
-                            send_to_all_chat_ids(max_price_group.to_string(False))
+
+                            signal_data = {
+                                "SignalType": 1,
+                                "SymbolCode": max_price_group.symbol,
+                                "IsUp": console_color != 'red',
+                                "EventTime": str(max_price_group.last_event_time.astimezone().isoformat()),
+                                "RecentPriceChange": str(max_price_group.relative_price_change),
+                                "TopPriceChange": str(max_price_group.total_price_change),
+                                "VolumeChange": str(max_price_group.total_volume_change),
+                                "LastPrice": str(max_price_group.last_price),
+                                "LastVolume": str(max_price_group.volume)
+                            }
+                            result_message = post_signal_to_api(signal_data)
+                            print(result_message)
+
                             anyPrinted = True
 
             sorted_price_group = sorted(price_groups, key=lambda k:abs(price_groups[k]['relative_price_change']))
@@ -183,10 +203,21 @@ def main():
                             if not header_printed:
                                 msg = "Top Relative Price Change"
                                 print(msg)
-                                send_to_all_chat_ids(msg)
                                 header_printed = True
                             print(max_price_group.to_string(True))
-                            send_to_all_chat_ids(max_price_group.to_string(False))
+                            signal_data = {
+                                "SignalType": 3,
+                                "SymbolCode": max_price_group.symbol,
+                                "IsUp": console_color != 'red',
+                                "EventTime": str(max_price_group.last_event_time.astimezone().isoformat()),
+                                "RecentPriceChange": str(max_price_group.relative_price_change),
+                                "TopPriceChange": str(max_price_group.total_price_change),
+                                "VolumeChange": str(max_price_group.total_volume_change),
+                                "LastPrice": str(max_price_group.last_price),
+                                "LastVolume": str(max_price_group.volume)
+                            }
+                            result_message = post_signal_to_api(signal_data)
+                            print(result_message)
                             anyPrinted = True
 
             sorted_price_group = sorted(price_groups, key=lambda k:price_groups[k]['total_volume_change'])
@@ -201,34 +232,40 @@ def main():
                             if not header_printed:
                                 msg = "Top Total Volume Change"
                                 print(msg)
-                                send_to_all_chat_ids(msg)
                                 header_printed = True
                             print(max_price_group.to_string(True))
-                            send_to_all_chat_ids(max_price_group.to_string(False))
+                            signal_data = {
+                                "SignalType": 2,
+                                "SymbolCode": max_price_group.symbol,
+                                "IsUp": console_color != 'red',
+                                "EventTime": str(max_price_group.last_event_time.astimezone().isoformat()),
+                                "RecentPriceChange": str(max_price_group.relative_price_change),
+                                "TopPriceChange": str(max_price_group.total_price_change),
+                                "VolumeChange": str(max_price_group.total_volume_change),
+                                "LastPrice": str(max_price_group.last_price),
+                                "LastVolume": str(max_price_group.volume)
+                            }
+                            result_message = post_signal_to_api(signal_data)
+                            print(result_message)
                             anyPrinted = True
 
             if anyPrinted:
                 print("")
 
     client = Client(api_config['api_key'], api_config['api_secret'])
-    # prices = client.get_all_tickers()
-    # pairs = list(pd.DataFrame(prices)['symbol'].values)
-    # pairs = [pair for pair in pairs if 'BTC' in pair]
-    # print(pairs)    
           
     bm = BinanceSocketManager(client)
     conn_key = bm.start_ticker_socket(process_message)
     bm.start()
     print('bm socket started')
 
-    tb.polling()
-    print('tb socket started')
-    
     input("Press Enter to continue...")
+
     bm.stop_socket(conn_key)
     bm.close()
-    print('Socket Closed')
-    return
     
+    print('Socket Closed')
+    return    
+
 if __name__ == '__main__':
     main()
