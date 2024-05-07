@@ -31,13 +31,18 @@ api_url = "http://127.0.0.1:5000/Signal"
 
 #API Connector
 def post_signal_to_api(signal_data):
+
+    now = datetime.now(pytz.utc)
+
+    if now.hour == 23 and now.minute == 59:
+        price_changes = []
+        price_groups = {}
     
     signal_data["requestToken"] = "XnE9BREaitRBYIFIqJ1MTuqbJdZzQRYwhlStPviHxrQN0Wmgl4H98HQVlTgXMIO7Xo3s5p3UaQd62eXN5xoeYcobZicEEVX6FLDoKAaudkksdSYvamoyf8fsQFt9DlnDzbiZjnE8rRMaxtSHoM22r2HwDEAmz9HJOnrzpQDdeso9LMtxiEHM7ynlVOYYetr5uGi59ZpvWtJ0TuHJ15HhFsidB3XhZj4IjIKd36g3WTCOb47M5b4lCBfXVAAL7ys4hs87PyAAFGVp2FxtAHAG8PlZTYJscaWE6Z7ok1SP6NBUzocXaAGM3cwNf3RNAiJY"
     
     try:
         response = requests.post(api_url, json=signal_data)
         
-        # Yanıtı kontrol et
         if response.status_code == 200:
             return "Signal sent."
         else:
@@ -50,10 +55,7 @@ def post_signal_to_api(signal_data):
 def main():
 
     def process_message(tickers):
-        # print("stream: {} data: {}".format(msg['stream'], msg['data']))
-        # print("Len {}".format(len(msg)))
-        # print("Currentb Price Of {} is {}".format(msg[0]['s'], msg[0]['c']))
-        
+
         for ticker in tickers:
             symbol = ticker['s']
 
@@ -65,9 +67,11 @@ def main():
             open = float(ticker['o'])
             volume = float(ticker['v'])
             event_time = dt.datetime.fromtimestamp(int(ticker['E'])/1000)
+
             if len(price_changes) > 0:
                 price_change = filter(lambda item: item.symbol == symbol, price_changes)
                 price_change = list(price_change)
+
                 if (len(price_change) > 0):
                     price_change = price_change[0]
                     price_change.event_time = event_time
@@ -84,7 +88,6 @@ def main():
                 price_changes.append(PriceChange(symbol, price, price, total_trades, open, volume, False, event_time, volume))
 
         price_changes.sort(key=operator.attrgetter('price_change_perc'), reverse=True)
-        #print(len(price_changes))
         
         for price_change in price_changes:
             console_color = 'green'
@@ -122,8 +125,10 @@ def main():
         if len(price_groups)>0:
             anyPrinted = False 
             sorted_price_group = sorted(price_groups, key=lambda k:price_groups[k]['tick_count'])
+
             if (len(sorted_price_group)>0):
                 sorted_price_group = list(reversed(sorted_price_group))
+
                 for s in range(show_limit):
                     header_printed=False
                     if (s<len(sorted_price_group)):
